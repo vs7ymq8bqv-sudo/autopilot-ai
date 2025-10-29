@@ -1,0 +1,6 @@
+name,dtype,description,unit,allowed_values,min,max,nullable,pii
+sepal_length,float,Lunghezza sepalo,cm,,0,10,false,false
+sepal_width,float,Larghezza sepalo,cm,,0,10,false,false
+petal_length,float,Lunghezza petalo,cm,,0,10,false,false
+petal_width,float,Larghezza petalo,cm,,0,10,false,false
+target,int,Classe (0=setosa,1=versicolor,2=virginica),,,0,2,false,false

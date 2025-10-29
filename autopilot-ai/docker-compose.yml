@@ -1,0 +1,50 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    image: autopilot-ai:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - AUTOPILOT_DATA_PATHS=${AUTOPILOT_DATA_PATHS}
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+      - LOGLEVEL=${LOGLEVEL:-info}
+      - TIMEOUT=${TIMEOUT:-60}
+    volumes:
+      - autopilot_models:/app/models
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ulimits:
+      nofile: 65536
+      nproc: 4096
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: "1g"
+    cpus: "1.0"
+    profiles: ["prod"]
+
+  api-dev:
+    build: .
+    image: autopilot-ai:dev
+    command: uvicorn app.serve:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - AUTOPILOT_DATA_PATHS=${AUTOPILOT_DATA_PATHS}
+      - LOGLEVEL=debug
+    volumes:
+      - ./:/app
+      - autopilot_models:/app/models
+    profiles: ["dev"]
+
+volumes:
+  autopilot_models:

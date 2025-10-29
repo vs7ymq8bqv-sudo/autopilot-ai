@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+.venv
+dist/
+build/
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+data/
+models/
+tests/__pycache__/
