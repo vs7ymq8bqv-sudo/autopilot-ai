@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pilota-automatico-ai
+    env: docker
+    plan: free
+    region: frankfurt        
+    branch: main           
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: AUTOPILOT_SCHEDULE
+        value: "0 3 * * *"
