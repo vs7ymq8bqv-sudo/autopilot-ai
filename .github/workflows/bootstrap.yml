@@ -1,0 +1,101 @@
+name: Bootstrap Autopilot
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scrivi file app, Dockerfile e cron
+        run: |
+          mkdir -p .github/workflows
+
+          cat > app.py <<'PY'
+          import os, time, threading, requests
+          from flask import Flask, jsonify, request, abort
+          app = Flask(__name__)
+          AUTOPILOT_KEY = os.environ.get("AUTOPILOT_KEY","")
+          PING_URL = os.environ.get("PING_URL")
+          _lock = threading.Lock()
+          def _auth(req):
+              k = req.args.get("key") or req.headers.get("Authorization","").replace("Bearer ","")
+              return AUTOPILOT_KEY and k == AUTOPILOT_KEY
+
+          @app.get("/")
+          def home(): return "Autopilot AI è online ✅", 200
+
+          @app.get("/health")
+          def health(): return jsonify(ok=True, ts=time.time())
+
+          @app.route("/run", methods=["GET","POST"])
+          def run():
+              if not _auth(request): abort(401, "Bad key")
+              if not _lock.acquire(blocking=False): return jsonify(status="busy"), 423
+              try:
+                  res = {}
+                  if PING_URL:
+                      try:
+                          r = requests.get(PING_URL, timeout=10)
+                          res["ping"] = r.status_code
+                      except Exception as e:
+                          res["ping_error"] = str(e)
+                  return jsonify(ok=True, results=res)
+              finally:
+                  try: _lock.release()
+                  except: pass
+
+          if __name__ == "__main__":
+              app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+          PY
+
+          cat > requirements.txt <<'REQ'
+          Flask==3.0.2
+          gunicorn==21.2.0
+          requests==2.31.0
+          REQ
+
+          cat > Dockerfile <<'DF'
+          FROM python:3.11-slim
+          ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+          WORKDIR /app
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir -r requirements.txt
+          COPY . .
+          CMD ["sh","-c","gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT app:app"]
+          DF
+
+          cat > .github/workflows/autopilot.yml <<'YML'
+          name: Nightly Autopilot
+          on:
+            schedule:
+              - cron: "0 3 * * *"   # 03:00 UTC
+            workflow_dispatch: {}
+          jobs:
+            call:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Wake (istanza free)
+                  run: curl -sS https://pilota-automatico-ai.onrender.com/ || true
+                - name: Trigger /run con chiave
+                  env:
+                    KEY: ${{ secrets.AUTOPILOT_KEY }}
+                  run: |
+                    for i in {1..8}; do
+                      curl -sSf -H "Authorization: Bearer $KEY" "https://pilota-automatico-ai.onrender.com/run" && exit 0
+                      sleep 20
+                    done
+                    echo "Autopilot non raggiungibile" >&2
+                    exit 1
+          YML
+
+      - name: Commit dei file generati
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py requirements.txt Dockerfile .github/workflows/autopilot.yml
+          git commit -m "bootstrap: app + docker + cron" || echo "no changes"
+          git push
